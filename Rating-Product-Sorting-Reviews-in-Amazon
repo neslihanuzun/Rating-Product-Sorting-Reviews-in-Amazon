@@ -1,0 +1,229 @@
+# Rating Product & Sorting Reviews in Amazon
+
+#Bussines Problem: This dataset includes product categories and various metadata of Amazon.com.
+# The product with the most comments in the electronics category has user ratings and comments.
+
+#Data Set
+
+# reviewerID            :User ID
+# asin                  :Product ID
+# reviewerName          :User name
+# helpful               :Useful review rating
+# reviewText            :Review text
+# overall               :Product rating
+# summary               :Review summary
+# unixReviewTime        :Review time
+# reviewTime            :Review time Raw
+# day_diff              :Number of days since review
+# helpful_yes           :The number of times the review was found useful
+# total_vote            :Number of votes given to the review
+
+#Imports and Analysing Data
+
+import pandas as pd
+import math
+import scipy.stats as st
+import datetime as dt
+from sklearn.preprocessing import MinMaxScaler
+import math
+import scipy.stats as st
+
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.width', 500)
+pd.set_option('display.expand_frame_repr', False)
+pd.set_option('display.float_format', lambda x: '%.5f' % x)
+
+df = pd.read_csv("amazon_review.csv")
+
+df.head()
+Out[3]: 
+       reviewerID        asin  reviewerName helpful                                         reviewText  overall                                 summary  unixReviewTime  reviewTime  day_diff  helpful_yes  total_vote
+0  A3SBTW3WS4IQSN  B007WTAJTO           NaN  [0, 0]                                         No issues.  4.00000                              Four Stars      1406073600  2014-07-23       138            0           0
+1  A18K1ODH1I2MVB  B007WTAJTO          0mie  [0, 0]  Purchased this for my device, it worked as adv...  5.00000                           MOAR SPACE!!!      1382659200  2013-10-25       409            0           0
+2  A2FII3I2MBMUIA  B007WTAJTO           1K3  [0, 0]  it works as expected. I should have sprung for...  4.00000               nothing to really say....      1356220800  2012-12-23       715            0           0
+3   A3H99DFEG68SR  B007WTAJTO           1m2  [0, 0]  This think has worked out great.Had a diff. br...  5.00000  Great buy at this price!!!  *** UPDATE      1384992000  2013-11-21       382            0           0
+4  A375ZM4U047O79  B007WTAJTO  2&amp;1/2Men  [0, 0]  Bought it with Retail Packaging, arrived legit...  5.00000                        best deal around      1373673600  2013-07-13       513            0           0
+
+df.shape
+Out[2]: (4915, 12)
+
+def check_df(df, head=5):
+    print("##################### Shape #####################")
+    print(df.shape)
+    print("##################### Types #####################")
+    print(df.dtypes)
+    print("##################### Head #####################")
+    print(df.head(head))
+    print("##################### Tail #####################")
+    print(df.tail(head))
+    print("##################### NA #####################")
+    print(df.isnull().sum())
+    print("##################### Quantiles #####################")
+    print(df.describe([0, 0.05, 0.50, 0.95, 0.99, 1]).T)
+
+
+check_df(df)
+
+##################### Shape #####################
+(4915, 12)
+##################### Types #####################
+reviewerID         object
+asin               object
+reviewerName       object
+helpful            object
+reviewText         object
+overall           float64
+summary            object
+unixReviewTime      int64
+reviewTime         object
+day_diff            int64
+helpful_yes         int64
+total_vote          int64
+dtype: object
+##################### Head #####################
+       reviewerID        asin  reviewerName helpful                                         reviewText  overall                                 summary  unixReviewTime  reviewTime  day_diff  helpful_yes  total_vote
+0  A3SBTW3WS4IQSN  B007WTAJTO           NaN  [0, 0]                                         No issues.  4.00000                              Four Stars      1406073600  2014-07-23       138            0           0
+1  A18K1ODH1I2MVB  B007WTAJTO          0mie  [0, 0]  Purchased this for my device, it worked as adv...  5.00000                           MOAR SPACE!!!      1382659200  2013-10-25       409            0           0
+2  A2FII3I2MBMUIA  B007WTAJTO           1K3  [0, 0]  it works as expected. I should have sprung for...  4.00000               nothing to really say....      1356220800  2012-12-23       715            0           0
+3   A3H99DFEG68SR  B007WTAJTO           1m2  [0, 0]  This think has worked out great.Had a diff. br...  5.00000  Great buy at this price!!!  *** UPDATE      1384992000  2013-11-21       382            0           0
+4  A375ZM4U047O79  B007WTAJTO  2&amp;1/2Men  [0, 0]  Bought it with Retail Packaging, arrived legit...  5.00000                        best deal around      1373673600  2013-07-13       513            0           0
+##################### Tail #####################
+          reviewerID        asin reviewerName helpful                                         reviewText  overall                        summary  unixReviewTime  reviewTime  day_diff  helpful_yes  total_vote
+4910  A2LBMKXRM5H2W9  B007WTAJTO       ZM "J"  [0, 0]  I bought this Sandisk 16GB Class 10 to use wit...  1.00000       Do not waste your money.      1374537600  2013-07-23       503            0           0
+4911   ALGDLRUI1ZPCS  B007WTAJTO           Zo  [0, 0]  Used this for extending the capabilities of my...  5.00000                    Great item!      1377129600  2013-08-22       473            0           0
+4912  A2MR1NI0ENW2AD  B007WTAJTO    Z S Liske  [0, 0]  Great card that is very fast and reliable. It ...  5.00000  Fast and reliable memory card      1396224000  2014-03-31       252            0           0
+4913  A37E6P3DSO9QJD  B007WTAJTO     Z Taylor  [0, 0]  Good amount of space for the stuff I want to d...  5.00000              Great little card      1379289600  2013-09-16       448            0           0
+4914   A8KGFTFQ86IBR  B007WTAJTO          Zza  [0, 0]  I've heard bad things about this 64gb Micro SD...  5.00000                So far so good.      1388620800  2014-02-01       310            0           0
+##################### NA #####################
+reviewerID        0
+asin              0
+reviewerName      1
+helpful           0
+reviewText        1
+overall           0
+summary           0
+unixReviewTime    0
+reviewTime        0
+day_diff          0
+helpful_yes       0
+total_vote        0
+dtype: int64
+##################### Quantiles #####################
+                    count             mean            std              min               0%               5%              50%              95%              99%             100%              max
+overall        4915.00000          4.58759        0.99685          1.00000          1.00000          2.00000          5.00000          5.00000          5.00000          5.00000          5.00000
+unixReviewTime 4915.00000 1379465001.66836 15818574.32275 1339200000.00000 1339200000.00000 1354492800.00000 1381276800.00000 1403308800.00000 1404950400.00000 1406073600.00000 1406073600.00000
+day_diff       4915.00000        437.36704      209.43987          1.00000          1.00000         98.00000        431.00000        748.00000        943.00000       1064.00000       1064.00000
+helpful_yes    4915.00000          1.31109       41.61916          0.00000          0.00000          0.00000          0.00000          1.00000          3.00000       1952.00000       1952.00000
+total_vote     4915.00000          1.52146       44.12309          0.00000          0.00000          0.00000          0.00000          1.00000          4.00000       2020.00000       2020.00000
+
+
+#Avarage Rating
+
+df["overall"].mean()
+#4.587589013224822
+
+# Time-Based Weighted Average
+
+df["reviewTime"] = pd.to_datetime(df["reviewTime"], dayfirst=True)
+df["reviewTime"].max()
+current_date = pd.to_datetime("2014-12-09")
+df["days"] = (current_date - df["reviewTime"]).dt.days
+df.head()
+
+q1 = df["days"].quantile(0.25)
+#282
+q2 = df["days"].quantile(0.50)
+#432
+q3 = df["days"].quantile(0.75)
+#602
+
+df.loc[df["days"] <= q1, "overall"].mean() * 28 / 100 + \
+    df.loc[(df["days"] > q1) & (df["days"] <= q2), "overall"].mean() * 26 / 100 + \
+    df.loc[(df["days"] > q2) & (df["days"] <= q3), "overall"].mean() * 24 / 100 + \
+    df.loc[(df["days"] > q3), "overall"].mean() * 22 / 100
+
+#out: 4.595593165128118
+
+df.loc[df["days"] <= q1, "overall"].mean()
+#4.6957928802588995
+
+df.loc[(df["days"] > q1) & (df["days"] <= q2), "overall"].mean()
+#4.636140637775961
+
+df.loc[(df["days"] > q2) & (df["days"] <= q3), "overall"].mean()
+#4.571661237785016
+
+df.loc[(df["days"] > q3), "overall"].mean()
+#4.4462540716612375
+
+hdf["helpful_no"] = df["total_vote"] - df["helpful_yes"]
+
+df.head()
+def score_up_down_diff(yes, no):
+    return helpful_yes - helpful_no
+
+df["score_pos_neg_diff"] = score_up_down_diff(df["helpful_yes"], df["helpful_no"])
+
+def score_average_rating(yes, no):
+    if yes + no == 0:
+        return 0
+    else:
+    return yes / (yes + no)
+
+df["score_average_rating"] = df.apply(lambda i: score_average_rating(i["helpful_yes"], i["helpful_no"]), axis=1)
+
+def wilson_lower_bound(yes, no, confidence=0.95):
+    """
+
+    Parameters
+    ----------
+    up: int
+        up count
+    down: int
+        down count
+    confidence: float
+        confidence
+
+    Returns
+    -------
+    wilson score: float
+
+    """
+    n = yes + no
+    if n == 0:
+        return 0
+    z = st.norm.ppf(1 - (1 - confidence) / 2)
+    phat = 1.0 * yes / n
+    return (phat + z * z / (2 * n) - z * math.sqrt((phat * (1 - phat) + z * z / (4 * n)) / n)) / (1 + z * z / n)
+
+
+df["wilson_lower_bound"] = df.apply(lambda i: wilson_lower_bound(i["helpful_yes"],
+                                                                 i["helpful_no"]),axis=1)
+
+df.sort_values("wilson_lower_bound", ascending=False).head(20)
+
+Out[42]: 
+          reviewerID        asin                          reviewerName       helpful                                         reviewText  overall                                            summary  unixReviewTime reviewTime  day_diff  helpful_yes  total_vote  days  helpful_no  score_pos_neg_diff  score_average_rating  wilson_lower_bound
+2031  A12B7ZMXFI6IXY  B007WTAJTO                  Hyoun Kim "Faluzure"  [1952, 2020]  [[ UPDATE - 6/19/2014 ]]So my lovely wife boug...  5.00000  UPDATED - Great w/ Galaxy S4 & Galaxy Tab 4 10...      1367366400 2013-01-05       702         1952        2020   703          68                1884               0.96634             0.95754
+3449   AOEAD7DPLZE53  B007WTAJTO                     NLee the Engineer  [1428, 1505]  I have tested dozens of SDHC and micro-SDHC ca...  5.00000  Top of the class among all (budget-priced) mic...      1348617600 2012-09-26       803         1428        1505   804          77                1351               0.94884             0.93652
+4212   AVBMZZAFEKO58  B007WTAJTO                           SkincareCEO  [1568, 1694]  NOTE:  please read the last update (scroll to ...  1.00000  1 Star reviews - Micro SDXC card unmounts itse...      1375660800 2013-05-08       579         1568        1694   580         126                1442               0.92562             0.91214
+317   A1ZQAQFYSXL5MQ  B007WTAJTO               Amazon Customer "Kelly"    [422, 495]  If your card gets hot enough to be painful, it...  1.00000                                Warning, read this!      1346544000 2012-02-09      1033          422         495  1034          73                 349               0.85253             0.81858
+4672  A2DKQQIZ793AV5  B007WTAJTO                               Twister      [45, 49]  Sandisk announcement of the first 128GB micro ...  5.00000  Super high capacity!!!  Excellent price (on Am...      1394150400 2014-07-03       158           45          49   159           4                  41               0.91837             0.80811
+1835  A1J6VSUM80UAF8  B007WTAJTO                           goconfigure      [60, 68]  Bought from BestBuy online the day it was anno...  5.00000                                           I own it      1393545600 2014-02-28       283           60          68   284           8                  52               0.88235             0.78465
+3981  A1K91XXQ6ZEBQR  B007WTAJTO            R. Sutton, Jr. "RWSynergy"    [112, 139]  The last few days I have been diligently shopp...  5.00000  Resolving confusion between "Mobile Ultra" and...      1350864000 2012-10-22       777          112         139   778          27                  85               0.80576             0.73214
+3807   AFGRMORWY2QNX  B007WTAJTO                            R. Heisler      [22, 25]  I bought this card to replace a lost 16 gig in...  3.00000   Good buy for the money but wait, I had an issue!      1361923200 2013-02-27       649           22          25   650           3                  19               0.88000             0.70044
+4306   AOHXKM5URSKAB  B007WTAJTO                         Stellar Eller      [51, 65]  While I got this card as a "deal of the day" o...  5.00000                                      Awesome Card!      1339200000 2012-09-06       823           51          65   824          14                  37               0.78462             0.67033
+4596  A1WTQUOQ4WG9AI  B007WTAJTO           Tom Henriksen "Doggy Diner"     [82, 109]  Hi:I ordered two card and they arrived the nex...  1.00000     Designed incompatibility/Don't support SanDisk      1348272000 2012-09-22       807           82         109   808          27                  55               0.75229             0.66359
+315   A2J26NNQX6WKAU  B007WTAJTO            Amazon Customer "johncrea"      [38, 48]  Bought this card to use with my Samsung Galaxy...  5.00000  Samsung Galaxy Tab2 works with this card if re...      1344816000 2012-08-13       847           38          48   848          10                  28               0.79167             0.65741
+1465   A6I8KXYK24RTB  B007WTAJTO                              D. Stein        [7, 7]  I for one have not bought into Google's, or an...  4.00000                                           Finally.      1397433600 2014-04-14       238            7           7   239           0                   7               1.00000             0.64567
+1609  A2TPXOZSU1DACQ  B007WTAJTO                                Eskimo        [7, 7]  I have always been a sandisk guy.  This cards ...  5.00000                  Bet you wish you had one of these      1395792000 2014-03-26       257            7           7   258           0                   7               1.00000             0.64567
+4302  A2EL2GWJ9T0DWY  B007WTAJTO                             Stayeraug      [14, 16]  So I got this SD specifically for my GoPro Bla...  5.00000                        Perfect with GoPro Black 3+      1395360000 2014-03-21       262           14          16   263           2                  12               0.87500             0.63977
+4072  A22GOZTFA02O2F  B007WTAJTO                           sb21 "sb21"        [6, 6]  I used this for my Samsung Galaxy Tab 2 7.0 . ...  5.00000               Used for my Samsung Galaxy Tab 2 7.0      1347321600 2012-11-09       759            6           6   760           0                   6               1.00000             0.60967
+1072  A2O96COBMVY9C4  B007WTAJTO                        Crysis Complex        [5, 5]  What more can I say? The 64GB micro SD works f...  5.00000               Works wonders for the Galaxy Note 2!      1349395200 2012-05-10       942            5           5   943           0                   5               1.00000             0.56552
+2583  A3MEPYZVTAV90W  B007WTAJTO                               J. Wong        [5, 5]  I bought this Class 10 SD card for my GoPro 3 ...  5.00000                  Works Great with a GoPro 3 Black!      1370649600 2013-08-06       489            5           5   490           0                   5               1.00000             0.56552
+121   A2Z4VVF1NTJWPB  B007WTAJTO                                A. Lee        [5, 5]  Update: providing an update with regard to San...  5.00000                     ready for use on the Galaxy S3      1346803200 2012-05-09       943            5           5   944           0                   5               1.00000             0.56552
+1142  A1PLHPPAJ5MUXG  B007WTAJTO  Daniel Pham(Danpham_X @ yahoo.  com)        [5, 5]  As soon as I saw that this card was announced ...  5.00000                          Great large capacity card      1396396800 2014-02-04       307            5           5   308           0                   5               1.00000             0.56552
+1753   ALPLKR59QMBUX  B007WTAJTO                             G. Becker        [5, 5]  Puchased this card right after I received my S...  5.00000                    Use Nothing Other Than the Best      1350864000 2012-10-22       777            5           5   778           0                   5               1.00000             0.56552
+
+
